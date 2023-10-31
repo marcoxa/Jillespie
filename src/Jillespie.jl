@@ -1,5 +1,10 @@
 ### -*- Mode: Julia -*-
 
+"
+module Jillespie
+
+An implementation of Gillespie's Stochastic/Montecarlo simulation algorithm.
+"
 module Jillespie
 
 using StatsBase
@@ -9,7 +14,7 @@ using Distributions
 export greet, Model, simulate
 
 "The Jillespie module greeting."
-greet() = print("Jillespie: a simple Gillespie implementation.")
+greet() = print("Jillespie: a Gillespie simulation algorithm  implementation.")
 
 macro lambda(args, body)
     :($args -> $body)
@@ -25,25 +30,51 @@ Model
 A collection of species and reactions.
 "
 struct Model
-    species
+    inital_state
+    state
     state_changes
     reactions
-    function Model(species, sc, reactions)
-        new(Dict{Symbol, Int64}(map(Pair,
-                                    species,
-                                    zeros(Int64, length(species)))),
-            sc,
+    
+    function Model(initial_state :: Dict{Symbol, Int64}, reactions)
+        new(initial_state,
+            copy(initial_state),
+            [],
             reactions)
     end
 end
 
 
-Model(species :: Vector{Symbol}) = Model(species, [], [])
+function Model(species :: Vector{Symbol}, reacts)
+    Model(Dict{Symbol, Int64}(map(Pair,
+                                  species,
+                                  zeros(Int64, length(species)))),
+          reacts)
+end
 
-Model(initial :: Dict{Symbol, Int64}) = Model(keys(initial), [initial], [])
 
-function Model(initial :: Vector{Tuple{Symbol, Int64}})
-    Model(map(first, intial), [Dict(intial)], [])
+function Model(initial :: Vector{Tuple{Symbol, Int64}}, reacts)
+    Model(Dict(intial), reacts)
+end
+
+
+function Model(initial)
+    Model(initial, [])
+end
+
+
+### Specie
+### ======
+
+function add_specie(model, symbol, initial = 0)
+    @assert initial >= 0
+    model.species[symbol] = initial
+end
+
+
+function set_specie(model, symbol, n)
+    @assert n >= 0
+    @assert symbol in keys(model.species)
+    model.species[symbol] = n
 end
 
 
@@ -68,24 +99,53 @@ struct Reaction
 end
 
 
-function Reaction(model, variables, stoich, form :: Expr)
-    Reaction(model, variables, (@lambda variables form), stoich)
+function Reaction(model, variables, stoich, propensity_form :: Expr)
+    Reaction(model, variables, (@lambda variables propensity_form), stoich)
 end
 
 
+"
+happen(reaction :: Reaction)
+
+Updates the overall state in the model (a slot in `reaction`)
+"
 function happen(reaction)
     m =  reaction.model
     vs = reaction.reactants
     s =  reaction.stoichiometry
 
-    # foreach(
-    
+    function reactvar_change(v, s)
+        m.state[v] += s[v]
+    end
+
+    ## Note: in the following using `broadcast` would be very
+    ## cute. However a reaction just involves few reactants; a simple
+    ## loop over them might be more efficient.
+
+    ## broadcast(v -> m.state[v] += s[v], vs)
+
+    for v in vs
+        m.state[v] += s[v]      # Update the model's state.
+    end
+
+    push!(m.state_changes, s)   # Record the change.
+
+    return reaction
 end
     
 
+"
+current_propensity
 
-function selectvars(react, state)
-    
+Computes the propensity of a reaction in the current state.
+"
+function current_propensity(reaction)
+    m =  reaction.model
+    vs = reaction.reactants
+    ## s =  reaction.stoichiometry
+    p =  reaction.propensity
+
+    p(map(v -> m.state[v], vs))
 end
 
 
