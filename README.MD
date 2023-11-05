@@ -4,7 +4,7 @@ A [Julia](https://www.julialang.org) implemention of *Gillespie's
 Stochastic Simulation* procedure(s) for biochemical systems.
 
 The implementation is essentially an exploration of Julia's
-capabilities; it tires to be "efficient" and "usable", by defining a
+capabilities; it tries to be "efficient" and "usable", by defining a
 *Domain Specific Language* based on macros.
 
 
